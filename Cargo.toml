@@ -2,6 +2,9 @@
 name = "rss-miner"
 version = "0.1.0"
 edition = "2021"
+description = "CLI tool that finds RSS/Atom feeds from URLs and generates OPML."
+repository = "https://github.com/RustedBytes/rss-miner"
+homepage = "https://github.com/RustedBytes/rss-miner"
 license = "MIT"
 
 [lib]
