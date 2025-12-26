@@ -181,13 +181,14 @@ pub fn create_opml_file(feeds: &[RssFeed], output_path: &Path) -> Result<()> {
     });
 
     let mut outlines = Vec::new();
-    let mut seen_urls = HashSet::new();
+    let mut seen_urls = HashSet::with_capacity(feeds.len());
 
     for feed in feeds {
         // Skip duplicate feeds based on URL
-        if !seen_urls.insert(feed.url.clone()) {
+        if seen_urls.contains(&feed.url) {
             continue;
         }
+        seen_urls.insert(feed.url.clone());
 
         let feed_type_str = match feed.feed_type {
             FeedType::Rss => "rss",
