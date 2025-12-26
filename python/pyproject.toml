@@ -33,4 +33,5 @@ Issues = "https://github.com/RustedBytes/rss-miner/issues"
 [tool.maturin]
 features = ["python"]
 module-name = "rss_miner.rss_miner"
-python-source = "rss_miner"
+python-source = "."
+manifest-path = "../Cargo.toml"

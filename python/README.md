@@ -15,17 +15,19 @@ High-performance Python bindings for the rss-miner Rust library. Discover RSS/At
 ## Requirements
 
 - Python 3.10 or higher
-- [uv](https://github.com/astral-sh/uv) for development (recommended)
+- [uv](https://github.com/astral-sh/uv) (recommended) or Python's built-in venv for development
 
 ## Installation
 
-### Using pip
+### Using pip (when published to PyPI)
 
 ```bash
 pip install rss-miner
 ```
 
-### Using uv (recommended for development)
+### Development Setup
+
+#### Option 1: Using uv (recommended)
 
 ```bash
 # Install uv if you haven't already
@@ -39,15 +41,37 @@ source .venv/bin/activate  # On Unix/macOS
 # or
 .venv\Scripts\activate  # On Windows
 
-# Install the package in development mode
-uv pip install -e .
+# Install maturin
+uv pip install maturin
+
+# Build and install the package in development mode
+maturin develop --release
+```
+
+#### Option 2: Using Python venv
+
+```bash
+# Create a virtual environment
+python3 -m venv .venv
+
+# Activate the virtual environment
+source .venv/bin/activate  # On Unix/macOS
+# or
+.venv\Scripts\activate  # On Windows
+
+# Install maturin
+pip install maturin
+
+# Build and install the package in development mode
+maturin develop --release
 ```
 
 ### Building from source
 
 ```bash
-# Install maturin
-uv pip install maturin
+# After setting up your virtual environment with either uv or venv
+# Install maturin if not already installed
+pip install maturin
 
 # Build and install
 maturin develop --release
@@ -190,28 +214,35 @@ See the [examples](./examples/) directory for more usage examples:
 git clone https://github.com/RustedBytes/rss-miner.git
 cd rss-miner/python
 
-# Install uv
+# Option 1: Using uv (recommended)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Create and activate virtual environment
 uv venv
 source .venv/bin/activate  # Unix/macOS
+uv pip install maturin
 
-# Install development dependencies
-uv pip install maturin pytest
+# Option 2: Using Python venv
+python3 -m venv .venv
+source .venv/bin/activate  # Unix/macOS
+pip install maturin
 
 # Build the extension in development mode
-maturin develop
+maturin develop --release
 ```
 
 ### Running Tests
 
 ```bash
-# Run Python tests
+# Run the basic test script
+python test_basic.py
+
+# Or run with pytest (if installed)
+pip install pytest
 pytest
 
 # Run Rust tests
 cd ..
+cargo test --features python
+```
 cargo test --features python
 ```
 

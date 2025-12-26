@@ -10,14 +10,18 @@ from .rss_miner import (
     find_feeds_parallel,
     read_urls,
     create_opml,
-    PyRssFeed as RssFeed,
+    PyRssFeed,
 )
+
+# Create a convenient alias
+RssFeed = PyRssFeed
 
 __all__ = [
     "find_feeds",
     "find_feeds_parallel",
     "read_urls",
     "create_opml",
+    "PyRssFeed",
     "RssFeed",
 ]
 
