@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use rayon::prelude::*;
 use reqwest::blocking::Client;
 use scraper::{Html, Selector};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use url::Url;
@@ -180,8 +181,15 @@ pub fn create_opml_file(feeds: &[RssFeed], output_path: &Path) -> Result<()> {
     });
 
     let mut outlines = Vec::new();
+    let mut seen_urls = HashSet::with_capacity(feeds.len());
 
     for feed in feeds {
+        // Skip duplicate feeds based on URL
+        if seen_urls.contains(&feed.url) {
+            continue;
+        }
+        seen_urls.insert(feed.url.clone());
+
         let feed_type_str = match feed.feed_type {
             FeedType::Rss => "rss",
             FeedType::Atom => "atom",
@@ -282,6 +290,63 @@ mod tests {
         assert!(content.contains("https://example.com/feed1.xml"));
         assert!(content.contains("https://example.com/feed2.xml"));
         assert!(content.contains("<opml"));
+    }
+
+    #[test]
+    fn test_create_opml_file_with_duplicates() {
+        let feeds = vec![
+            RssFeed {
+                title: "Test Feed 1".to_string(),
+                url: "https://example.com/feed1.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Rss,
+            },
+            RssFeed {
+                title: "Test Feed 2".to_string(),
+                url: "https://example.com/feed2.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Atom,
+            },
+            RssFeed {
+                title: "Test Feed 1 Duplicate".to_string(),
+                url: "https://example.com/feed1.xml".to_string(), // Duplicate URL
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Rss,
+            },
+            RssFeed {
+                title: "Test Feed 3".to_string(),
+                url: "https://example.com/feed3.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Rss,
+            },
+            RssFeed {
+                title: "Test Feed 2 Duplicate".to_string(),
+                url: "https://example.com/feed2.xml".to_string(), // Duplicate URL
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Atom,
+            },
+        ];
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let output_path = temp_file.path();
+
+        create_opml_file(&feeds, output_path).unwrap();
+
+        let content = fs::read_to_string(output_path).unwrap();
+        
+        // Should contain first occurrence of each feed
+        assert!(content.contains("Test Feed 1"));
+        assert!(content.contains("Test Feed 2"));
+        assert!(content.contains("Test Feed 3"));
+        
+        // Should NOT contain duplicate titles
+        assert!(!content.contains("Test Feed 1 Duplicate"));
+        assert!(!content.contains("Test Feed 2 Duplicate"));
+        
+        // Count occurrences of each URL - should appear only once
+        assert_eq!(content.matches("https://example.com/feed1.xml").count(), 1);
+        assert_eq!(content.matches("https://example.com/feed2.xml").count(), 1);
+        assert_eq!(content.matches("https://example.com/feed3.xml").count(), 1);
     }
 }
 
