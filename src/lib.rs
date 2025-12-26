@@ -187,7 +187,7 @@ pub fn create_opml_file_filtered(
     let title = match feed_type_filter {
         Some(FeedType::Rss) => "RSS Feeds",
         Some(FeedType::Atom) => "Atom Feeds",
-        None => "RSS Feeds",
+        None => "RSS and Atom Feeds",
     };
     
     opml.head = Some(opml::Head {
@@ -312,6 +312,7 @@ mod tests {
         assert!(content.contains("https://example.com/feed1.xml"));
         assert!(content.contains("https://example.com/feed2.xml"));
         assert!(content.contains("<opml"));
+        assert!(content.contains("RSS and Atom Feeds"));
     }
 
     #[test]
