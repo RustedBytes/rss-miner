@@ -168,6 +168,43 @@ Create an OPML file from a list of feeds.
 rss_miner.create_opml(feeds, "my_feeds.opml")
 ```
 
+#### `create_opml_rss_only(feeds: list[RssFeed], output_path: str) -> None`
+
+Create an OPML file containing only RSS feeds from a list of feeds.
+
+**Parameters:**
+- `feeds` (list[RssFeed]): List of RssFeed objects to filter and include in the OPML
+- `output_path` (str): Path where the OPML file will be saved
+
+**Notes:**
+- Only feeds with `feed_type == "rss"` will be included
+- Useful for creating feed collections specific to RSS readers that prefer RSS format
+
+**Example:**
+```python
+# Create an OPML file with only RSS feeds
+rss_miner.create_opml_rss_only(feeds, "rss_feeds_only.opml")
+```
+
+#### `create_opml_atom_only(feeds: list[RssFeed], output_path: str) -> None`
+
+Create an OPML file containing only Atom feeds from a list of feeds.
+
+**Parameters:**
+- `feeds` (list[RssFeed]): List of RssFeed objects to filter and include in the OPML
+- `output_path` (str): Path where the OPML file will be saved
+
+**Notes:**
+- Only feeds with `feed_type == "atom"` will be included
+- Useful for creating feed collections specific to RSS readers that prefer Atom format
+
+**Example:**
+```python
+# Create an OPML file with only Atom feeds
+rss_miner.create_opml_atom_only(feeds, "atom_feeds_only.opml")
+```
+
+
 ### Classes
 
 #### `RssFeed`
@@ -205,6 +242,7 @@ See the [examples](./examples/) directory for more usage examples:
 - [file_input.py](./examples/file_input.py) - Read URLs from file
 - [error_handling.py](./examples/error_handling.py) - Handle errors gracefully
 - [complete_workflow.py](./examples/complete_workflow.py) - Full workflow from file to OPML
+- [separate_feed_types.py](./examples/separate_feed_types.py) - Save RSS and Atom feeds separately
 
 ## Development
 
@@ -249,13 +287,53 @@ cargo test --features python
 
 ### Building Wheels
 
+You can build wheels for distribution using maturin. By default, wheels are built to the `target/wheels` directory, but you can specify a custom output directory.
+
+#### Build wheel to dist folder
+
+```bash
+# Build wheel for current platform to dist folder
+maturin build --release --out dist
+
+# The wheel will be created in the dist/ directory
+# dist/rss_miner-0.1.0-cp310-cp310-linux_x86_64.whl (example)
+```
+
+#### Build for current platform (default location)
+
 ```bash
 # Build wheel for current platform
 maturin build --release
 
-# Build wheels for multiple platforms (requires Docker)
-maturin build --release --manylinux 2014
+# Wheel will be in target/wheels/
 ```
+
+#### Build for multiple platforms
+
+```bash
+# Build wheels for multiple platforms (requires Docker)
+maturin build --release --manylinux 2014 --out dist
+
+# Build for specific Python versions
+maturin build --release --out dist --interpreter python3.10 python3.11 python3.12
+```
+
+#### Install the built wheel
+
+```bash
+# Install the wheel from the dist folder
+pip install dist/rss_miner-*.whl
+
+# Or install directly from target/wheels
+pip install target/wheels/rss_miner-*.whl
+```
+
+**Notes:**
+- The `--out` parameter specifies the output directory for the wheel
+- Use `--release` for optimized builds
+- The wheel filename includes the platform and Python version
+- Wheels in the `dist/` folder are typically used for distribution and uploading to PyPI
+
 
 ## Performance
 
