@@ -204,6 +204,7 @@ See the [examples](./examples/) directory for more usage examples:
 - [batch_processing.py](./examples/batch_processing.py) - Process multiple URLs
 - [file_input.py](./examples/file_input.py) - Read URLs from file
 - [error_handling.py](./examples/error_handling.py) - Handle errors gracefully
+- [complete_workflow.py](./examples/complete_workflow.py) - Full workflow from file to OPML
 
 ## Development
 
