@@ -1,0 +1,14 @@
+# Example URLs for RSS feed discovery
+# Lines starting with # are comments and will be ignored
+# Empty lines are also ignored
+
+# Tech blogs
+https://github.blog
+https://stackoverflow.blog
+
+# Programming languages
+https://www.rust-lang.org/
+https://go.dev/
+
+# News sites
+https://news.ycombinator.com/

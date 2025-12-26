@@ -1425,6 +1425,7 @@ dependencies = [
  "reqwest",
  "rss",
  "scraper",
+ "tempfile",
  "url",
 ]
 

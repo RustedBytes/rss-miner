@@ -232,3 +232,78 @@ fn create_opml_file(feeds: &[RssFeed], output_path: &PathBuf) -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_read_urls_from_file() {
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "# Comment line").unwrap();
+        writeln!(temp_file, "https://example.com").unwrap();
+        writeln!(temp_file).unwrap();
+        writeln!(temp_file, "https://test.com").unwrap();
+        writeln!(temp_file, "  https://trimmed.com  ").unwrap();
+
+        let urls = read_urls_from_file(&temp_file.path().to_path_buf()).unwrap();
+        assert_eq!(urls.len(), 3);
+        assert_eq!(urls[0], "https://example.com");
+        assert_eq!(urls[1], "https://test.com");
+        assert_eq!(urls[2], "https://trimmed.com");
+    }
+
+    #[test]
+    fn test_resolve_url_absolute() {
+        let result = resolve_url("https://example.com", "https://feed.example.com/rss").unwrap();
+        assert_eq!(result, "https://feed.example.com/rss");
+    }
+
+    #[test]
+    fn test_resolve_url_relative() {
+        let result = resolve_url("https://example.com", "/feed.xml").unwrap();
+        assert_eq!(result, "https://example.com/feed.xml");
+    }
+
+    #[test]
+    fn test_extract_title_from_url() {
+        let title = extract_title_from_url("https://example.com/path");
+        assert_eq!(title, "example.com");
+    }
+
+    #[test]
+    fn test_extract_title_from_invalid_url() {
+        let title = extract_title_from_url("not-a-url");
+        assert_eq!(title, "Unknown");
+    }
+
+    #[test]
+    fn test_create_opml_file() {
+        let feeds = vec![
+            RssFeed {
+                title: "Test Feed 1".to_string(),
+                url: "https://example.com/feed1.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+            },
+            RssFeed {
+                title: "Test Feed 2".to_string(),
+                url: "https://example.com/feed2.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+            },
+        ];
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let output_path = temp_file.path().to_path_buf();
+
+        create_opml_file(&feeds, &output_path).unwrap();
+
+        let content = fs::read_to_string(&output_path).unwrap();
+        assert!(content.contains("Test Feed 1"));
+        assert!(content.contains("Test Feed 2"));
+        assert!(content.contains("https://example.com/feed1.xml"));
+        assert!(content.contains("https://example.com/feed2.xml"));
+        assert!(content.contains("<opml"));
+    }
+}
