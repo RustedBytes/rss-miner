@@ -15,7 +15,7 @@ pub struct RssFeed {
     pub feed_type: FeedType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FeedType {
     Rss,
     Atom,
@@ -174,9 +174,24 @@ fn extract_title_from_url(url: &str) -> String {
 }
 
 pub fn create_opml_file(feeds: &[RssFeed], output_path: &Path) -> Result<()> {
+    create_opml_file_filtered(feeds, output_path, None)
+}
+
+pub fn create_opml_file_filtered(
+    feeds: &[RssFeed],
+    output_path: &Path,
+    feed_type_filter: Option<FeedType>,
+) -> Result<()> {
     let mut opml = opml::OPML::default();
+
+    let title = match feed_type_filter {
+        Some(FeedType::Rss) => "RSS Feeds",
+        Some(FeedType::Atom) => "Atom Feeds",
+        None => "RSS and Atom Feeds",
+    };
+
     opml.head = Some(opml::Head {
-        title: Some("RSS Feeds".to_string()),
+        title: Some(title.to_string()),
         ..Default::default()
     });
 
@@ -184,6 +199,13 @@ pub fn create_opml_file(feeds: &[RssFeed], output_path: &Path) -> Result<()> {
     let mut seen_urls = HashSet::with_capacity(feeds.len());
 
     for feed in feeds {
+        // Skip if feed doesn't match the filter
+        if let Some(filter_type) = feed_type_filter {
+            if filter_type != feed.feed_type {
+                continue;
+            }
+        }
+
         // Skip duplicate feeds based on URL
         if seen_urls.contains(&feed.url) {
             continue;
@@ -290,6 +312,7 @@ mod tests {
         assert!(content.contains("https://example.com/feed1.xml"));
         assert!(content.contains("https://example.com/feed2.xml"));
         assert!(content.contains("<opml"));
+        assert!(content.contains("RSS and Atom Feeds"));
     }
 
     #[test]
@@ -347,6 +370,94 @@ mod tests {
         assert_eq!(content.matches("https://example.com/feed1.xml").count(), 1);
         assert_eq!(content.matches("https://example.com/feed2.xml").count(), 1);
         assert_eq!(content.matches("https://example.com/feed3.xml").count(), 1);
+    }
+
+    #[test]
+    fn test_create_opml_file_rss_only() {
+        let feeds = vec![
+            RssFeed {
+                title: "RSS Feed 1".to_string(),
+                url: "https://example.com/rss1.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Rss,
+            },
+            RssFeed {
+                title: "Atom Feed 1".to_string(),
+                url: "https://example.com/atom1.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Atom,
+            },
+            RssFeed {
+                title: "RSS Feed 2".to_string(),
+                url: "https://example.com/rss2.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Rss,
+            },
+        ];
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let output_path = temp_file.path();
+
+        create_opml_file_filtered(&feeds, output_path, Some(FeedType::Rss)).unwrap();
+
+        let content = fs::read_to_string(output_path).unwrap();
+
+        // Should contain RSS feeds only
+        assert!(content.contains("RSS Feed 1"));
+        assert!(content.contains("RSS Feed 2"));
+        assert!(content.contains("https://example.com/rss1.xml"));
+        assert!(content.contains("https://example.com/rss2.xml"));
+        
+        // Should NOT contain Atom feeds
+        assert!(!content.contains("Atom Feed 1"));
+        assert!(!content.contains("https://example.com/atom1.xml"));
+        
+        // Should have appropriate title
+        assert!(content.contains("RSS Feeds"));
+    }
+
+    #[test]
+    fn test_create_opml_file_atom_only() {
+        let feeds = vec![
+            RssFeed {
+                title: "RSS Feed 1".to_string(),
+                url: "https://example.com/rss1.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Rss,
+            },
+            RssFeed {
+                title: "Atom Feed 1".to_string(),
+                url: "https://example.com/atom1.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Atom,
+            },
+            RssFeed {
+                title: "Atom Feed 2".to_string(),
+                url: "https://example.com/atom2.xml".to_string(),
+                html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Atom,
+            },
+        ];
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let output_path = temp_file.path();
+
+        create_opml_file_filtered(&feeds, output_path, Some(FeedType::Atom)).unwrap();
+
+        let content = fs::read_to_string(output_path).unwrap();
+
+        // Should contain Atom feeds only
+        assert!(content.contains("Atom Feed 1"));
+        assert!(content.contains("Atom Feed 2"));
+        assert!(content.contains("https://example.com/atom1.xml"));
+        assert!(content.contains("https://example.com/atom2.xml"));
+        
+        // Should NOT contain RSS feeds
+        assert!(!content.contains("RSS Feed 1"));
+        assert!(!content.contains("https://example.com/rss1.xml"));
+        
+        // Should have appropriate title
+        assert!(content.contains("Atom Feeds"));
     }
 }
 
@@ -430,10 +541,9 @@ pub mod python {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
     }
 
-    /// Create an OPML file from a list of feeds
-    #[pyfunction]
-    fn create_opml(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
-        let rust_feeds: Vec<RssFeed> = feeds
+    /// Helper function to convert Python feeds to Rust feeds
+    fn convert_py_feeds_to_rust(feeds: Vec<PyRssFeed>) -> Vec<RssFeed> {
+        feeds
             .into_iter()
             .map(|py_feed| RssFeed {
                 title: py_feed.title,
@@ -445,10 +555,33 @@ pub mod python {
                     FeedType::Atom
                 },
             })
-            .collect();
+            .collect()
+    }
 
+    /// Create an OPML file from a list of feeds
+    #[pyfunction]
+    fn create_opml(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
+        let rust_feeds = convert_py_feeds_to_rust(feeds);
         let path = Path::new(&output_path);
         create_opml_file(&rust_feeds, path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
+    }
+
+    /// Create an OPML file containing only RSS feeds
+    #[pyfunction]
+    fn create_opml_rss_only(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
+        let rust_feeds = convert_py_feeds_to_rust(feeds);
+        let path = Path::new(&output_path);
+        create_opml_file_filtered(&rust_feeds, path, Some(FeedType::Rss))
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
+    }
+
+    /// Create an OPML file containing only Atom feeds
+    #[pyfunction]
+    fn create_opml_atom_only(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
+        let rust_feeds = convert_py_feeds_to_rust(feeds);
+        let path = Path::new(&output_path);
+        create_opml_file_filtered(&rust_feeds, path, Some(FeedType::Atom))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
     }
 
@@ -460,6 +593,8 @@ pub mod python {
         m.add_function(wrap_pyfunction!(find_feeds_parallel, m)?)?;
         m.add_function(wrap_pyfunction!(read_urls, m)?)?;
         m.add_function(wrap_pyfunction!(create_opml, m)?)?;
+        m.add_function(wrap_pyfunction!(create_opml_rss_only, m)?)?;
+        m.add_function(wrap_pyfunction!(create_opml_atom_only, m)?)?;
         Ok(())
     }
 }
