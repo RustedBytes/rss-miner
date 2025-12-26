@@ -34,12 +34,17 @@ fn main() -> Result<()> {
     let urls = read_urls_from_file(&args.input)?;
     println!("Found {} URLs to process", urls.len());
 
+    // Create a shared HTTP client for all operations
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
+
     // Find RSS feeds in parallel using Rayon
     let feeds: Vec<RssFeed> = urls
         .par_iter()
         .filter_map(|url| {
             println!("Processing: {}", url);
-            match find_rss_feeds(url) {
+            match find_rss_feeds(url, &client) {
                 Ok(feeds) => {
                     if !feeds.is_empty() {
                         println!("  Found {} feed(s) for {}", feeds.len(), url);
@@ -86,11 +91,7 @@ fn read_urls_from_file(path: &PathBuf) -> Result<Vec<String>> {
     Ok(urls)
 }
 
-fn find_rss_feeds(url: &str) -> Result<Vec<RssFeed>> {
-    let client = Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()?;
-
+fn find_rss_feeds(url: &str, client: &Client) -> Result<Vec<RssFeed>> {
     // Fetch the page
     let response = client.get(url).send()?;
     let html_content = response.text()?;
@@ -108,7 +109,7 @@ fn find_rss_feeds(url: &str) -> Result<Vec<RssFeed>> {
             let feed_url = resolve_url(url, href)?;
 
             // Validate the feed
-            if validate_rss_feed(&feed_url) {
+            if validate_rss_feed(&feed_url, client) {
                 let title = element
                     .value()
                     .attr("title")
@@ -137,7 +138,7 @@ fn find_rss_feeds(url: &str) -> Result<Vec<RssFeed>> {
 
         for path in common_paths {
             if let Ok(feed_url) = resolve_url(url, path) {
-                if validate_rss_feed(&feed_url) {
+                if validate_rss_feed(&feed_url, client) {
                     feeds.push(RssFeed {
                         title: extract_title_from_url(url),
                         url: feed_url,
@@ -158,15 +159,7 @@ fn resolve_url(base: &str, href: &str) -> Result<String> {
     Ok(resolved.to_string())
 }
 
-fn validate_rss_feed(feed_url: &str) -> bool {
-    let client = match Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-
+fn validate_rss_feed(feed_url: &str, client: &Client) -> bool {
     // Try to fetch and parse the feed
     match client.get(feed_url).send() {
         Ok(response) => {
