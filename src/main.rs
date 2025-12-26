@@ -107,10 +107,9 @@ fn find_rss_feeds(url: &str, client: &Client) -> Result<Vec<RssFeed>> {
     let mut feeds = Vec::new();
 
     // Look for RSS/Atom feed links in the HTML
-    let link_selector = Selector::parse(
-        "link[type='application/rss+xml'], link[type='application/atom+xml']",
-    )
-    .expect("Failed to parse CSS selector");
+    let link_selector =
+        Selector::parse("link[type='application/rss+xml'], link[type='application/atom+xml']")
+            .expect("Failed to parse CSS selector");
 
     for element in document.select(&link_selector) {
         if let Some(href) = element.value().attr("href") {
