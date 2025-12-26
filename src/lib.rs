@@ -200,10 +200,9 @@ pub fn create_opml_file_filtered(
 
     for feed in feeds {
         // Skip if feed doesn't match the filter
-        if let Some(ref filter_type) = feed_type_filter {
-            match (filter_type, &feed.feed_type) {
-                (FeedType::Rss, FeedType::Rss) | (FeedType::Atom, FeedType::Atom) => {}
-                _ => continue,
+        if let Some(filter_type) = feed_type_filter {
+            if filter_type != feed.feed_type {
+                continue;
             }
         }
 
@@ -541,10 +540,9 @@ pub mod python {
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
     }
 
-    /// Create an OPML file from a list of feeds
-    #[pyfunction]
-    fn create_opml(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
-        let rust_feeds: Vec<RssFeed> = feeds
+    /// Helper function to convert Python feeds to Rust feeds
+    fn convert_py_feeds_to_rust(feeds: Vec<PyRssFeed>) -> Vec<RssFeed> {
+        feeds
             .into_iter()
             .map(|py_feed| RssFeed {
                 title: py_feed.title,
@@ -556,8 +554,13 @@ pub mod python {
                     FeedType::Atom
                 },
             })
-            .collect();
+            .collect()
+    }
 
+    /// Create an OPML file from a list of feeds
+    #[pyfunction]
+    fn create_opml(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
+        let rust_feeds = convert_py_feeds_to_rust(feeds);
         let path = Path::new(&output_path);
         create_opml_file(&rust_feeds, path)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
@@ -566,20 +569,7 @@ pub mod python {
     /// Create an OPML file containing only RSS feeds
     #[pyfunction]
     fn create_opml_rss_only(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
-        let rust_feeds: Vec<RssFeed> = feeds
-            .into_iter()
-            .map(|py_feed| RssFeed {
-                title: py_feed.title,
-                url: py_feed.url,
-                html_url: py_feed.html_url,
-                feed_type: if py_feed.feed_type == "rss" {
-                    FeedType::Rss
-                } else {
-                    FeedType::Atom
-                },
-            })
-            .collect();
-
+        let rust_feeds = convert_py_feeds_to_rust(feeds);
         let path = Path::new(&output_path);
         create_opml_file_filtered(&rust_feeds, path, Some(FeedType::Rss))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
@@ -588,20 +578,7 @@ pub mod python {
     /// Create an OPML file containing only Atom feeds
     #[pyfunction]
     fn create_opml_atom_only(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
-        let rust_feeds: Vec<RssFeed> = feeds
-            .into_iter()
-            .map(|py_feed| RssFeed {
-                title: py_feed.title,
-                url: py_feed.url,
-                html_url: py_feed.html_url,
-                feed_type: if py_feed.feed_type == "rss" {
-                    FeedType::Rss
-                } else {
-                    FeedType::Atom
-                },
-            })
-            .collect();
-
+        let rust_feeds = convert_py_feeds_to_rust(feeds);
         let path = Path::new(&output_path);
         create_opml_file_filtered(&rust_feeds, path, Some(FeedType::Atom))
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
