@@ -1,8 +1,18 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use reqwest::blocking::Client;
-use rss_miner::{create_opml_file, find_rss_feeds_parallel, read_urls_from_file};
+use rss_miner::{create_opml_file_filtered, find_rss_feeds_parallel, read_urls_from_file, FeedType};
 use std::path::PathBuf;
+
+#[derive(Debug, Clone, ValueEnum)]
+enum FeedFilter {
+    /// Save only RSS feeds
+    Rss,
+    /// Save only Atom feeds
+    Atom,
+    /// Save both RSS and Atom feeds
+    Both,
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "rss-miner")]
@@ -15,6 +25,10 @@ struct Args {
     /// Output OPML file path
     #[arg(short, long, value_name = "FILE", default_value = "feeds.opml")]
     output: PathBuf,
+
+    /// Filter feeds by type (rss, atom, or both)
+    #[arg(short, long, value_enum, default_value = "both")]
+    filter: FeedFilter,
 }
 
 fn main() -> Result<()> {
@@ -39,8 +53,15 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    // Create OPML file
-    create_opml_file(&feeds, &args.output)?;
+    // Convert filter option to FeedType
+    let feed_type_filter = match args.filter {
+        FeedFilter::Rss => Some(FeedType::Rss),
+        FeedFilter::Atom => Some(FeedType::Atom),
+        FeedFilter::Both => None,
+    };
+
+    // Create OPML file with the selected filter
+    create_opml_file_filtered(&feeds, &args.output, feed_type_filter)?;
     println!("OPML file created: {}", args.output.display());
 
     Ok(())
