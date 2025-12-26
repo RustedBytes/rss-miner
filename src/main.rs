@@ -25,6 +25,13 @@ struct RssFeed {
     title: String,
     url: String,
     html_url: String,
+    feed_type: FeedType,
+}
+
+#[derive(Debug, Clone)]
+enum FeedType {
+    Rss,
+    Atom,
 }
 
 fn main() -> Result<()> {
@@ -77,7 +84,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn read_urls_from_file(path: &PathBuf) -> Result<Vec<String>> {
+fn read_urls_from_file(path: &std::path::Path) -> Result<Vec<String>> {
     let content =
         fs::read_to_string(path).context(format!("Failed to read file: {}", path.display()))?;
 
@@ -100,16 +107,17 @@ fn find_rss_feeds(url: &str, client: &Client) -> Result<Vec<RssFeed>> {
     let mut feeds = Vec::new();
 
     // Look for RSS/Atom feed links in the HTML
-    let link_selector =
-        Selector::parse("link[type='application/rss+xml'], link[type='application/atom+xml']")
-            .unwrap();
+    let link_selector = Selector::parse(
+        "link[type='application/rss+xml'], link[type='application/atom+xml']",
+    )
+    .expect("Failed to parse CSS selector");
 
     for element in document.select(&link_selector) {
         if let Some(href) = element.value().attr("href") {
             let feed_url = resolve_url(url, href)?;
 
-            // Validate the feed
-            if validate_rss_feed(&feed_url, client) {
+            // Validate the feed and get its type
+            if let Some(feed_type) = validate_rss_feed(&feed_url, client) {
                 let title = element
                     .value()
                     .attr("title")
@@ -120,6 +128,7 @@ fn find_rss_feeds(url: &str, client: &Client) -> Result<Vec<RssFeed>> {
                     title,
                     url: feed_url,
                     html_url: url.to_string(),
+                    feed_type,
                 });
             }
         }
@@ -138,11 +147,12 @@ fn find_rss_feeds(url: &str, client: &Client) -> Result<Vec<RssFeed>> {
 
         for path in common_paths {
             if let Ok(feed_url) = resolve_url(url, path) {
-                if validate_rss_feed(&feed_url, client) {
+                if let Some(feed_type) = validate_rss_feed(&feed_url, client) {
                     feeds.push(RssFeed {
                         title: extract_title_from_url(url),
                         url: feed_url,
                         html_url: url.to_string(),
+                        feed_type,
                     });
                     break; // Only add the first valid common feed found
                 }
@@ -159,32 +169,32 @@ fn resolve_url(base: &str, href: &str) -> Result<String> {
     Ok(resolved.to_string())
 }
 
-fn validate_rss_feed(feed_url: &str, client: &Client) -> bool {
+fn validate_rss_feed(feed_url: &str, client: &Client) -> Option<FeedType> {
     // Try to fetch and parse the feed
     match client.get(feed_url).send() {
         Ok(response) => {
             if !response.status().is_success() {
-                return false;
+                return None;
             }
 
             match response.text() {
                 Ok(content) => {
                     // Try to parse as RSS
                     if rss::Channel::read_from(content.as_bytes()).is_ok() {
-                        return true;
+                        return Some(FeedType::Rss);
                     }
 
                     // Try to parse as Atom
                     if atom_syndication::Feed::read_from(content.as_bytes()).is_ok() {
-                        return true;
+                        return Some(FeedType::Atom);
                     }
 
-                    false
+                    None
                 }
-                Err(_) => false,
+                Err(_) => None,
             }
         }
-        Err(_) => false,
+        Err(_) => None,
     }
 }
 
@@ -195,7 +205,7 @@ fn extract_title_from_url(url: &str) -> String {
         .unwrap_or_else(|| "Unknown".to_string())
 }
 
-fn create_opml_file(feeds: &[RssFeed], output_path: &PathBuf) -> Result<()> {
+fn create_opml_file(feeds: &[RssFeed], output_path: &std::path::Path) -> Result<()> {
     let mut opml = opml::OPML::default();
     opml.head = Some(opml::Head {
         title: Some("RSS Feeds".to_string()),
@@ -205,9 +215,14 @@ fn create_opml_file(feeds: &[RssFeed], output_path: &PathBuf) -> Result<()> {
     let mut outlines = Vec::new();
 
     for feed in feeds {
+        let feed_type_str = match feed.feed_type {
+            FeedType::Rss => "rss",
+            FeedType::Atom => "atom",
+        };
+
         let outline = opml::Outline {
             text: feed.title.clone(),
-            r#type: Some("rss".to_string()),
+            r#type: Some(feed_type_str.to_string()),
             xml_url: Some(feed.url.clone()),
             html_url: Some(feed.html_url.clone()),
             ..Default::default()
@@ -241,7 +256,7 @@ mod tests {
         writeln!(temp_file, "https://test.com").unwrap();
         writeln!(temp_file, "  https://trimmed.com  ").unwrap();
 
-        let urls = read_urls_from_file(&temp_file.path().to_path_buf()).unwrap();
+        let urls = read_urls_from_file(temp_file.path()).unwrap();
         assert_eq!(urls.len(), 3);
         assert_eq!(urls[0], "https://example.com");
         assert_eq!(urls[1], "https://test.com");
@@ -279,20 +294,22 @@ mod tests {
                 title: "Test Feed 1".to_string(),
                 url: "https://example.com/feed1.xml".to_string(),
                 html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Rss,
             },
             RssFeed {
                 title: "Test Feed 2".to_string(),
                 url: "https://example.com/feed2.xml".to_string(),
                 html_url: "https://example.com".to_string(),
+                feed_type: FeedType::Atom,
             },
         ];
 
         let temp_file = NamedTempFile::new().unwrap();
-        let output_path = temp_file.path().to_path_buf();
+        let output_path = temp_file.path();
 
-        create_opml_file(&feeds, &output_path).unwrap();
+        create_opml_file(&feeds, output_path).unwrap();
 
-        let content = fs::read_to_string(&output_path).unwrap();
+        let content = fs::read_to_string(output_path).unwrap();
         assert!(content.contains("Test Feed 1"));
         assert!(content.contains("Test Feed 2"));
         assert!(content.contains("https://example.com/feed1.xml"));
