@@ -284,3 +284,117 @@ mod tests {
         assert!(content.contains("<opml"));
     }
 }
+
+// Python bindings module
+#[cfg(feature = "python")]
+pub mod python {
+    use super::*;
+    use pyo3::prelude::*;
+    use std::collections::HashMap;
+
+    /// Python wrapper for RssFeed
+    #[pyclass]
+    #[derive(Clone)]
+    pub struct PyRssFeed {
+        #[pyo3(get)]
+        pub title: String,
+        #[pyo3(get)]
+        pub url: String,
+        #[pyo3(get)]
+        pub html_url: String,
+        #[pyo3(get)]
+        pub feed_type: String,
+    }
+
+    impl From<RssFeed> for PyRssFeed {
+        fn from(feed: RssFeed) -> Self {
+            PyRssFeed {
+                title: feed.title,
+                url: feed.url,
+                html_url: feed.html_url,
+                feed_type: match feed.feed_type {
+                    FeedType::Rss => "rss".to_string(),
+                    FeedType::Atom => "atom".to_string(),
+                },
+            }
+        }
+    }
+
+    #[pymethods]
+    impl PyRssFeed {
+        fn __repr__(&self) -> String {
+            format!(
+                "RssFeed(title='{}', url='{}', html_url='{}', feed_type='{}')",
+                self.title, self.url, self.html_url, self.feed_type
+            )
+        }
+
+        fn to_dict(&self) -> HashMap<String, String> {
+            let mut map = HashMap::new();
+            map.insert("title".to_string(), self.title.clone());
+            map.insert("url".to_string(), self.url.clone());
+            map.insert("html_url".to_string(), self.html_url.clone());
+            map.insert("feed_type".to_string(), self.feed_type.clone());
+            map
+        }
+    }
+
+    /// Find RSS/Atom feeds from a single URL
+    #[pyfunction]
+    fn find_feeds(url: String) -> PyResult<Vec<PyRssFeed>> {
+        let client = Client::new();
+        let feeds = find_rss_feeds(&url, &client)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e)))?;
+        Ok(feeds.into_iter().map(PyRssFeed::from).collect())
+    }
+
+    /// Find RSS/Atom feeds from multiple URLs in parallel
+    #[pyfunction]
+    #[pyo3(signature = (urls, verbose=false))]
+    fn find_feeds_parallel(urls: Vec<String>, verbose: bool) -> PyResult<Vec<PyRssFeed>> {
+        let client = Client::new();
+        let feeds = find_rss_feeds_parallel(&urls, &client, verbose);
+        Ok(feeds.into_iter().map(PyRssFeed::from).collect())
+    }
+
+    /// Read URLs from a text file
+    #[pyfunction]
+    fn read_urls(file_path: String) -> PyResult<Vec<String>> {
+        let path = Path::new(&file_path);
+        read_urls_from_file(path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
+    }
+
+    /// Create an OPML file from a list of feeds
+    #[pyfunction]
+    fn create_opml(feeds: Vec<PyRssFeed>, output_path: String) -> PyResult<()> {
+        let rust_feeds: Vec<RssFeed> = feeds
+            .into_iter()
+            .map(|py_feed| RssFeed {
+                title: py_feed.title,
+                url: py_feed.url,
+                html_url: py_feed.html_url,
+                feed_type: if py_feed.feed_type == "rss" {
+                    FeedType::Rss
+                } else {
+                    FeedType::Atom
+                },
+            })
+            .collect();
+
+        let path = Path::new(&output_path);
+        create_opml_file(&rust_feeds, path)
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyIOError, _>(format!("{}", e)))
+    }
+
+    /// RSS Miner Python module
+    #[pymodule]
+    fn rss_miner(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        m.add_class::<PyRssFeed>()?;
+        m.add_function(wrap_pyfunction!(find_feeds, m)?)?;
+        m.add_function(wrap_pyfunction!(find_feeds_parallel, m)?)?;
+        m.add_function(wrap_pyfunction!(read_urls, m)?)?;
+        m.add_function(wrap_pyfunction!(create_opml, m)?)?;
+        Ok(())
+    }
+}
