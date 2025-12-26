@@ -346,7 +346,7 @@ The Python bindings leverage Rust's performance and safety:
 
 ## License
 
-This project is dual-licensed under MIT OR Apache-2.0. See the LICENSE file in the repository root for details.
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file in the repository root for details.
 
 ## Contributing
 
