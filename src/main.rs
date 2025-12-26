@@ -30,7 +30,7 @@ fn main() -> Result<()> {
         .build()?;
 
     // Find RSS feeds in parallel using Rayon
-    let feeds = find_rss_feeds_parallel(&urls, &client);
+    let feeds = find_rss_feeds_parallel(&urls, &client, true);
 
     println!("\nTotal feeds found: {}", feeds.len());
 

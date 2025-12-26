@@ -98,22 +98,30 @@ pub fn find_rss_feeds(url: &str, client: &Client) -> Result<Vec<RssFeed>> {
     Ok(feeds)
 }
 
-pub fn find_rss_feeds_parallel(urls: &[String], client: &Client) -> Vec<RssFeed> {
+pub fn find_rss_feeds_parallel(urls: &[String], client: &Client, verbose: bool) -> Vec<RssFeed> {
     urls.par_iter()
         .filter_map(|url| {
-            println!("Processing: {}", url);
+            if verbose {
+                println!("Processing: {}", url);
+            }
             match find_rss_feeds(url, client) {
                 Ok(feeds) => {
                     if !feeds.is_empty() {
-                        println!("  Found {} feed(s) for {}", feeds.len(), url);
+                        if verbose {
+                            println!("  Found {} feed(s) for {}", feeds.len(), url);
+                        }
                         Some(feeds)
                     } else {
-                        println!("  No feeds found for {}", url);
+                        if verbose {
+                            println!("  No feeds found for {}", url);
+                        }
                         None
                     }
                 }
                 Err(e) => {
-                    eprintln!("  Error processing {}: {}", url, e);
+                    if verbose {
+                        eprintln!("  Error processing {}: {}", url, e);
+                    }
                     None
                 }
             }
