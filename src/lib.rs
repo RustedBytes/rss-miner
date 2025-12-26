@@ -183,13 +183,13 @@ pub fn create_opml_file_filtered(
     feed_type_filter: Option<FeedType>,
 ) -> Result<()> {
     let mut opml = opml::OPML::default();
-    
+
     let title = match feed_type_filter {
         Some(FeedType::Rss) => "RSS Feeds",
         Some(FeedType::Atom) => "Atom Feeds",
         None => "RSS and Atom Feeds",
     };
-    
+
     opml.head = Some(opml::Head {
         title: Some(title.to_string()),
         ..Default::default()
