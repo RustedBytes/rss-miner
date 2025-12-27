@@ -467,6 +467,7 @@ pub mod python {
     use super::*;
     use pyo3::prelude::*;
     use std::collections::HashMap;
+    use std::time::Duration;
 
     /// Python wrapper for RssFeed
     #[pyclass]
@@ -515,10 +516,17 @@ pub mod python {
         }
     }
 
+    fn build_client() -> PyResult<Client> {
+        Client::builder()
+            .timeout(Duration::from_secs(10))
+            .build()
+            .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e)))
+    }
+
     /// Find RSS/Atom feeds from a single URL
     #[pyfunction]
     fn find_feeds(url: String) -> PyResult<Vec<PyRssFeed>> {
-        let client = Client::new();
+        let client = build_client()?;
         let feeds = find_rss_feeds(&url, &client)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(format!("{}", e)))?;
         Ok(feeds.into_iter().map(PyRssFeed::from).collect())
@@ -528,7 +536,7 @@ pub mod python {
     #[pyfunction]
     #[pyo3(signature = (urls, verbose=false))]
     fn find_feeds_parallel(urls: Vec<String>, verbose: bool) -> PyResult<Vec<PyRssFeed>> {
-        let client = Client::new();
+        let client = build_client()?;
         let feeds = find_rss_feeds_parallel(&urls, &client, verbose);
         Ok(feeds.into_iter().map(PyRssFeed::from).collect())
     }
