@@ -25,12 +25,20 @@ pub fn read_urls_from_file(path: &Path) -> Result<Vec<String>> {
     let content =
         fs::read_to_string(path).context(format!("Failed to read file: {}", path.display()))?;
 
-    let urls: Vec<String> = content
-        .lines()
-        .map(|line| line.trim())
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(String::from)
-        .collect();
+    let mut urls = Vec::new();
+    let mut seen = HashSet::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        let normalized = normalize_to_domain_url(trimmed);
+        if seen.insert(normalized.clone()) {
+            urls.push(normalized);
+        }
+    }
 
     Ok(urls)
 }
@@ -185,6 +193,21 @@ fn extract_title_from_url(url: &str) -> String {
         .unwrap_or_else(|| "Unknown".to_string())
 }
 
+fn normalize_to_domain_url(input: &str) -> String {
+    if let Ok(url) = Url::parse(input) {
+        if let Some(host) = url.host_str() {
+            let mut base = format!("{}://{}", url.scheme(), host);
+            if let Some(port) = url.port() {
+                base.push(':');
+                base.push_str(&port.to_string());
+            }
+            return base;
+        }
+    }
+
+    input.to_string()
+}
+
 pub fn create_opml_file(feeds: &[RssFeed], output_path: &Path) -> Result<()> {
     create_opml_file_filtered(feeds, output_path, None)
 }
@@ -260,10 +283,11 @@ mod tests {
     fn test_read_urls_from_file() {
         let mut temp_file = NamedTempFile::new().unwrap();
         writeln!(temp_file, "# Comment line").unwrap();
-        writeln!(temp_file, "https://example.com").unwrap();
+        writeln!(temp_file, "https://example.com/path?query=1").unwrap();
         writeln!(temp_file).unwrap();
-        writeln!(temp_file, "https://test.com").unwrap();
-        writeln!(temp_file, "  https://trimmed.com  ").unwrap();
+        writeln!(temp_file, "https://test.com/another/path").unwrap();
+        writeln!(temp_file, "https://example.com/dup/path").unwrap();
+        writeln!(temp_file, "  https://trimmed.com/page  ").unwrap();
 
         let urls = read_urls_from_file(temp_file.path()).unwrap();
         assert_eq!(urls.len(), 3);
