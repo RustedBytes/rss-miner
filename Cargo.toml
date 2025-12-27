@@ -1,6 +1,6 @@
 [package]
 name = "rss-miner"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "CLI tool that finds RSS/Atom feeds from URLs and generates OPML."
 repository = "https://github.com/RustedBytes/rss-miner"
