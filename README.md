@@ -1,5 +1,8 @@
 # rss-miner
 
+[![Crates.io Version](https://img.shields.io/crates/v/rss-miner)](https://crates.io/crates/rss-miner)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-yellow.svg)](https://github.com/RustedBytes/rss-miner/blob/master/LICENSE)
+
 A CLI tool that finds RSS feeds from URLs and generates a valid OPML file.
 
 ## Features
