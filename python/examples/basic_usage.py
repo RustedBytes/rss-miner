@@ -10,10 +10,10 @@ import rss_miner
 def main():
     # Find feeds from a single URL
     print("Finding RSS/Atom feeds from https://github.blog...")
-    
+
     try:
         feeds = rss_miner.find_feeds("https://github.blog")
-        
+
         if feeds:
             print(f"\n✓ Found {len(feeds)} feed(s):\n")
             for i, feed in enumerate(feeds, 1):
@@ -24,7 +24,7 @@ def main():
                 print()
         else:
             print("\n✗ No feeds found")
-            
+
     except Exception as e:
         print(f"\n✗ Error: {e}")
 

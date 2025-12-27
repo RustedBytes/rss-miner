@@ -39,7 +39,11 @@ pub fn find_rss_feeds(url: &str, client: &Client) -> Result<Vec<RssFeed>> {
     // Fetch the page
     let response = client.get(url).send()?;
     let html_content = response.text()?;
-    let document = Html::parse_document(&html_content);
+    let document = if let Some(head_html) = extract_head_html(&html_content) {
+        Html::parse_fragment(head_html)
+    } else {
+        Html::parse_document(&html_content)
+    };
 
     let mut feeds = Vec::new();
 
@@ -166,6 +170,14 @@ fn validate_rss_feed(feed_url: &str, client: &Client) -> Option<FeedType> {
     }
 }
 
+fn extract_head_html(html: &str) -> Option<&str> {
+    let lower = html.to_ascii_lowercase();
+    let head_start = lower.find("<head")?;
+    let tag_end = lower[head_start..].find('>')? + head_start + 1;
+    let head_end = lower[tag_end..].find("</head")? + tag_end;
+    Some(&html[tag_end..head_end])
+}
+
 fn extract_title_from_url(url: &str) -> String {
     Url::parse(url)
         .ok()
@@ -282,6 +294,20 @@ mod tests {
     fn test_extract_title_from_invalid_url() {
         let title = extract_title_from_url("not-a-url");
         assert_eq!(title, "Unknown");
+    }
+
+    #[test]
+    fn test_extract_head_html() {
+        let html = "<html><head><link rel=\"alternate\" type=\"application/rss+xml\" href=\"/rss.xml\"></head><body>Content</body></html>";
+        let head = extract_head_html(html).unwrap();
+        assert!(head.contains("application/rss+xml"));
+        assert!(!head.contains("Content"));
+    }
+
+    #[test]
+    fn test_extract_head_html_missing() {
+        let html = "<html><body>No head</body></html>";
+        assert!(extract_head_html(html).is_none());
     }
 
     #[test]
@@ -532,13 +558,58 @@ pub mod python {
         Ok(feeds.into_iter().map(PyRssFeed::from).collect())
     }
 
-    /// Find RSS/Atom feeds from multiple URLs in parallel
+    /// Find RSS/Atom feeds from multiple URLs in parallel with per-URL status
     #[pyfunction]
     #[pyo3(signature = (urls, verbose=false))]
-    fn find_feeds_parallel(urls: Vec<String>, verbose: bool) -> PyResult<Vec<PyRssFeed>> {
+    fn find_feeds_parallel(
+        urls: Vec<String>,
+        verbose: bool,
+    ) -> PyResult<(Vec<PyRssFeed>, Vec<(String, String)>)> {
         let client = build_client()?;
-        let feeds = find_rss_feeds_parallel(&urls, &client, verbose);
-        Ok(feeds.into_iter().map(PyRssFeed::from).collect())
+        let results: Vec<(String, Vec<RssFeed>, bool)> = urls
+            .par_iter()
+            .map(|url| {
+                if verbose {
+                    println!("Processing: {}", url);
+                }
+                match find_rss_feeds(url, &client) {
+                    Ok(feeds) => {
+                        if verbose {
+                            if !feeds.is_empty() {
+                                println!("  Found {} feed(s) for {}", feeds.len(), url);
+                            } else {
+                                println!("  No feeds found for {}", url);
+                            }
+                        }
+                        (url.clone(), feeds, true)
+                    }
+                    Err(e) => {
+                        if verbose {
+                            eprintln!("  Error processing {}: {}", url, e);
+                        }
+                        (url.clone(), Vec::new(), false)
+                    }
+                }
+            })
+            .collect();
+
+        let statuses = results
+            .iter()
+            .map(|(url, _feeds, ok)| {
+                (
+                    url.clone(),
+                    if *ok { "success" } else { "failed" }.to_string(),
+                )
+            })
+            .collect();
+
+        let feeds = results
+            .into_iter()
+            .flat_map(|(_url, feeds, _ok)| feeds)
+            .map(PyRssFeed::from)
+            .collect();
+
+        Ok((feeds, statuses))
     }
 
     /// Read URLs from a text file

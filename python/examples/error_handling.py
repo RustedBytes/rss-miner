@@ -12,16 +12,16 @@ def find_with_error_handling(url):
     try:
         print(f"Processing: {url}")
         feeds = rss_miner.find_feeds(url)
-        
+
         if feeds:
             print(f"  ✓ Found {len(feeds)} feed(s)")
             for feed in feeds:
                 print(f"    • {feed.title}: {feed.url}")
         else:
-            print(f"  ⚠ No feeds found")
-        
+            print("  ⚠ No feeds found")
+
         return feeds
-        
+
     except RuntimeError as e:
         print(f"  ✗ Runtime error: {e}")
         return []
@@ -39,27 +39,27 @@ def main():
         "https://nonexistent-domain-12345.com",  # Invalid domain
         "not-a-valid-url",  # Invalid URL format
     ]
-    
+
     print("Processing URLs with error handling...\n")
-    
+
     all_feeds = []
     for url in urls:
         feeds = find_with_error_handling(url)
         all_feeds.extend(feeds)
         print()
-    
+
     # Summary
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Summary: Successfully found {len(all_feeds)} feed(s)")
-    print(f"{'='*60}")
-    
+    print(f"{'=' * 60}")
+
     if all_feeds:
         print("\nSuccessfully discovered feeds:")
         for i, feed in enumerate(all_feeds, 1):
             print(f"{i}. {feed.title}")
             print(f"   Feed: {feed.url}")
             print(f"   Site: {feed.html_url}")
-        
+
         # Create OPML with only valid feeds
         try:
             output_file = "valid_feeds.opml"

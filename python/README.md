@@ -93,7 +93,10 @@ urls = [
     "https://stackoverflow.blog",
     "https://www.rust-lang.org/"
 ]
-feeds = rss_miner.find_feeds_parallel(urls, verbose=True)
+feeds, statuses = rss_miner.find_feeds_parallel(urls, verbose=True)
+
+# Optional: check per-URL status
+failed = [url for url, status in statuses if status == "failed"]
 
 # Create an OPML file
 rss_miner.create_opml(feeds, "feeds.opml")
@@ -118,7 +121,7 @@ Find RSS/Atom feeds from a single URL.
 feeds = rss_miner.find_feeds("https://github.blog")
 ```
 
-#### `find_feeds_parallel(urls: list[str], verbose: bool = False) -> list[RssFeed]`
+#### `find_feeds_parallel(urls: list[str], verbose: bool = False) -> tuple[list[RssFeed], list[tuple[str, str]]]`
 
 Find RSS/Atom feeds from multiple URLs in parallel.
 
@@ -127,12 +130,14 @@ Find RSS/Atom feeds from multiple URLs in parallel.
 - `verbose` (bool, optional): Enable verbose output. Defaults to False.
 
 **Returns:**
-- List of all `RssFeed` objects found across all URLs
+- Tuple of `(feeds, statuses)`
+- `feeds`: List of all `RssFeed` objects found across all URLs
+- `statuses`: List of `(url, status)` entries where status is `"success"` or `"failed"`
 
 **Example:**
 ```python
 urls = ["https://github.blog", "https://stackoverflow.blog"]
-feeds = rss_miner.find_feeds_parallel(urls, verbose=True)
+feeds, statuses = rss_miner.find_feeds_parallel(urls, verbose=True)
 ```
 
 #### `read_urls(file_path: str) -> list[str]`
