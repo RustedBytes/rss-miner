@@ -25,6 +25,7 @@ url = "2.5"
 rss = "2.0"
 atom_syndication = "0.12"
 anyhow = "1.0"
+quick-xml = "0.39"
 
 [features]
 default = []

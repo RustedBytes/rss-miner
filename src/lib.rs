@@ -1,9 +1,13 @@
 use anyhow::{Context, Result};
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
+use quick_xml::writer::Writer;
 use rayon::prelude::*;
 use reqwest::blocking::Client;
 use scraper::{Html, Selector};
 use std::collections::HashSet;
 use std::fs;
+use std::io::Cursor;
 use std::path::Path;
 use url::Url;
 
@@ -208,6 +212,48 @@ fn normalize_to_domain_url(input: &str) -> String {
     input.to_string()
 }
 
+/// Formats XML string with indentation for better readability.
+///
+/// Takes compact XML and reformats it with proper line breaks and 2-space indentation.
+/// This makes the XML output more human-readable while maintaining semantic equivalence.
+///
+/// # Arguments
+///
+/// * `xml` - A string slice containing the XML to format
+///
+/// # Returns
+///
+/// * `Result<String>` - The formatted XML string, or an error if parsing/formatting fails
+///
+/// # Errors
+///
+/// Returns an error if:
+/// * The input XML is malformed
+/// * XML event writing fails
+/// * UTF-8 conversion fails
+fn pretty_print_xml(xml: &str) -> Result<String> {
+    const INDENT_CHAR: u8 = b' ';
+    const INDENT_SIZE: usize = 2;
+
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    
+    let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), INDENT_CHAR, INDENT_SIZE);
+    
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(event) => {
+                writer.write_event(event).context("Failed to write XML event")?;
+            }
+            Err(e) => return Err(anyhow::anyhow!("Error parsing XML: {}", e)),
+        }
+    }
+    
+    let result = writer.into_inner().into_inner();
+    String::from_utf8(result).context("Failed to convert XML to UTF-8")
+}
+
 pub fn create_opml_file(feeds: &[RssFeed], output_path: &Path) -> Result<()> {
     create_opml_file_filtered(feeds, output_path, None)
 }
@@ -265,7 +311,8 @@ pub fn create_opml_file_filtered(
     opml.body = opml::Body { outlines };
 
     let opml_string = opml.to_string()?;
-    fs::write(output_path, opml_string).context(format!(
+    let pretty_xml = pretty_print_xml(&opml_string)?;
+    fs::write(output_path, pretty_xml).context(format!(
         "Failed to write OPML file: {}",
         output_path.display()
     ))?;
