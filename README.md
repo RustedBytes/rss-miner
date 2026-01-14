@@ -83,16 +83,6 @@ https://go.dev/
    - Parsing it as RSS or Atom format
 5. **OPML Generation**: Creates a valid OPML file with all discovered and validated feeds
 
-## Dependencies
-
-- **clap**: Command-line argument parsing
-- **rayon**: Parallel processing
-- **reqwest**: HTTP client
-- **scraper**: HTML parsing
-- **opml**: OPML file generation
-- **rss**: RSS feed parsing and validation
-- **atom_syndication**: Atom feed parsing and validation
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
