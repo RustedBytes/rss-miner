@@ -7,11 +7,11 @@ A CLI tool that finds RSS feeds from URLs and generates a valid OPML file.
 
 ## Features
 
-- 🔍 **Parallel Processing**: Uses Rayon to process multiple URLs concurrently
-- ✅ **RSS Feed Validation**: Validates RSS/Atom feeds before including them
-- 📝 **OPML Generation**: Creates a valid OPML file compatible with feed readers
-- 🎯 **Auto-Discovery**: Finds RSS feeds in HTML link tags and common feed paths
-- 🛡️ **Error Handling**: Robust error handling with detailed feedback
+- **Parallel Processing**: Uses Rayon to process multiple URLs concurrently
+- **RSS Feed Validation**: Validates RSS/Atom feeds before including them
+- **OPML Generation**: Creates a valid OPML file compatible with feed readers
+- **Auto-Discovery**: Finds RSS feeds in HTML link tags and common feed paths
+- **Error Handling**: Robust error handling with detailed feedback
 
 ## Installation
 
