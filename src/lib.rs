@@ -1,9 +1,13 @@
 use anyhow::{Context, Result};
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
+use quick_xml::writer::Writer;
 use rayon::prelude::*;
 use reqwest::blocking::Client;
 use scraper::{Html, Selector};
 use std::collections::HashSet;
 use std::fs;
+use std::io::Cursor;
 use std::path::Path;
 use url::Url;
 
@@ -208,6 +212,26 @@ fn normalize_to_domain_url(input: &str) -> String {
     input.to_string()
 }
 
+fn pretty_print_xml(xml: &str) -> Result<String> {
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    
+    let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), b' ', 2);
+    
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => break,
+            Ok(event) => {
+                writer.write_event(event).context("Failed to write XML event")?;
+            }
+            Err(e) => return Err(anyhow::anyhow!("Error parsing XML: {}", e)),
+        }
+    }
+    
+    let result = writer.into_inner().into_inner();
+    String::from_utf8(result).context("Failed to convert XML to UTF-8")
+}
+
 pub fn create_opml_file(feeds: &[RssFeed], output_path: &Path) -> Result<()> {
     create_opml_file_filtered(feeds, output_path, None)
 }
@@ -265,7 +289,8 @@ pub fn create_opml_file_filtered(
     opml.body = opml::Body { outlines };
 
     let opml_string = opml.to_string()?;
-    fs::write(output_path, opml_string).context(format!(
+    let pretty_xml = pretty_print_xml(&opml_string)?;
+    fs::write(output_path, pretty_xml).context(format!(
         "Failed to write OPML file: {}",
         output_path.display()
     ))?;
