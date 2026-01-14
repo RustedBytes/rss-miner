@@ -212,11 +212,33 @@ fn normalize_to_domain_url(input: &str) -> String {
     input.to_string()
 }
 
+/// Formats XML string with indentation for better readability.
+///
+/// Takes compact XML and reformats it with proper line breaks and 2-space indentation.
+/// This makes the XML output more human-readable while maintaining semantic equivalence.
+///
+/// # Arguments
+///
+/// * `xml` - A string slice containing the XML to format
+///
+/// # Returns
+///
+/// * `Result<String>` - The formatted XML string, or an error if parsing/formatting fails
+///
+/// # Errors
+///
+/// Returns an error if:
+/// * The input XML is malformed
+/// * XML event writing fails
+/// * UTF-8 conversion fails
 fn pretty_print_xml(xml: &str) -> Result<String> {
+    const INDENT_CHAR: u8 = b' ';
+    const INDENT_SIZE: usize = 2;
+
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
     
-    let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), b' ', 2);
+    let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), INDENT_CHAR, INDENT_SIZE);
     
     loop {
         match reader.read_event() {
